@@ -1,0 +1,8 @@
+[package]
+name = "oxui"
+version = "0.1.0"
+authors = ["Jaroslaw Weber<jaroslaw.weber@gmail.com>"]
+
+[dependencies]
+piston_window = "0.67.0"
+find_folder = "0.3.0"
