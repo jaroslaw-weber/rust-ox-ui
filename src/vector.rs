@@ -1,5 +1,4 @@
-
-
+//pair of numbers
 #[derive(Copy,Clone, Debug)]
 pub struct Vector2 {
     x: i32,

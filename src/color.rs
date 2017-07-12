@@ -1,4 +1,4 @@
-
+//color as struct, also contains helper methods
 #[derive(Copy,Clone, Debug)]
 pub struct Color {
     color: (f32, f32, f32, f32),

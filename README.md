@@ -1,5 +1,5 @@
 # Rust Ox Ui
-High-level gui api for rust (early alpha). Need refactoring and comments.
+High-level gui api for rust (early alpha). Ready to create simple ui, althout api may change.
 
 # Goals
 - flexible - can make different kinds of ui
@@ -7,6 +7,7 @@ High-level gui api for rust (early alpha). Need refactoring and comments.
 - backend-agnostic, opengl on default
 - serializable - creating templates
 - editor mode - creating gui in editor
+- possible mobile framework
 
 # Inspirations
 - Unity3d
@@ -14,17 +15,21 @@ High-level gui api for rust (early alpha). Need refactoring and comments.
 - React
 - Bootstrap
 
-# Progress
-- Rectangle, Image, Text, Color - components
+# Implemented
+- Rectangle, Image, Text, Color, Button - components
 - Easy prototyping
 - Easy to serialize
+- Event system (buttons only for now)
+- State system (flutter/react like) - reloading only on state change
 
 # Need to be implemented
-- Button
-- State system (flutter/react like)
-- Event system
 - Window scrolling (html like view, considering mobile)
 - Input Field
 - Serialization
-- Editor
+- UI Visual Editor
+- Better Performance
+- Less boilerplate - more similar to flutter/html experience
+- Mobile
+- Divide library and example project to different repositories
+- Documentation
 

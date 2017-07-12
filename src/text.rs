@@ -1,5 +1,8 @@
 use color::Color;
 
+//todo font
+
+//text component
 #[derive(Debug)]
 pub struct Text {
     content: String,
