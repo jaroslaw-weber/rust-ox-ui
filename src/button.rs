@@ -1,5 +1,5 @@
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Button {
     id: i32,
 }

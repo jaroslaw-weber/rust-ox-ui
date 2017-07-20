@@ -1,5 +1,5 @@
 //image loading
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Image {
     path: String,
 }

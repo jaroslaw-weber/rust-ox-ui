@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 use piston_window::*;
-use find_folder;
 use widget::Widget;
 use vector::Vector2;
 use rect::Rectangle;
@@ -11,22 +10,14 @@ pub fn initialize(widget: &mut Widget) {
     //unroll widget
     let mut builded: Rectangle = widget.build();
 
-    let size: Vector2 = builded.get_size();
-    let name: String = builded.get_name();
+    let (size_x, size_y): (f32, f32) = widget.get_window_size();
+    let name: String = widget.get_window_name();
     let mut window: PistonWindow =
-        WindowSettings::new(name, (size.get_x() as u32, size.get_y() as u32))
+        WindowSettings::new(name, (size_x as u32, size_y as u32))
             .exit_on_esc(true)
             .build()
             .unwrap_or_else(|e| panic!("Failed to build PistonWindow: {}", e));
 
-    //font load
-    let assets = find_folder::Search::ParentsThenKids(3, 3)
-        .for_folder("assets")
-        .unwrap();
-    let ref font = assets.join("JosefinSans-Regular.ttf");
-    let factory = window.factory.clone();
-    let mut glyphs = Glyphs::new(font, factory).unwrap();
-    //font load end
     let mut image_factory = window.factory.clone();
 
     //redrawing loop
@@ -40,8 +31,12 @@ pub fn initialize(widget: &mut Widget) {
         /////PERFORMANCE CACHING
         //cached textures in hashmap, loading only once
         let mut textures_hashmap = HashMap::new();
+        //cache font glyphs in hashmap
+        //todo access by name not by layer id? benchmark to test which is better
+        let mut glyphs_hashmap = HashMap::new();
 
-        for (i, layer) in unrolled.get_layers().iter().enumerate() {
+        for (i, layer_global_info) in unrolled.get_layers().iter().enumerate() {
+            let &(layer, _) = layer_global_info;
             let img_option = layer.get_image();
             match img_option {
                 &Some(ref img) => {
@@ -52,6 +47,16 @@ pub fn initialize(widget: &mut Widget) {
                         Texture::from_path(&mut image_factory, path, Flip::None, &txt_set).unwrap();
                     textures_hashmap.insert(i, texture);
                     println!("found texture in layer: {}", i);
+                }
+                &None => (),
+            }
+            let txt_option = layer.get_text();
+            match txt_option {
+                &Some(ref txt) => {
+                    let font_path = txt.get_font_path();
+                    let mut font = load_font(&font_path, &window);
+                    glyphs_hashmap.insert(i, font);
+
                 }
                 &None => (),
             }
@@ -73,14 +78,24 @@ pub fn initialize(widget: &mut Widget) {
                     let (mpx, mpy) = mouse_pos;
                     //todo reverse
                     let mut should_rebuild = false;
-                    for layer in unrolled.get_layers().iter().rev() {
+                    for layer_info in unrolled.get_layers().iter().rev() {
+                        let &(layer, global_position) = layer_info;
                         let button_option = layer.get_button();
                         match button_option {
                             &Some(ref btn) => {
                                 let btn_id = btn.get_id();
-                                let clicked_this = layer.contains_point(mpx as i32, mpy as i32);
+                                //todo fix for local position
+                                //todo
+                                let mpx = mpx as f32;
+                                let mpy = mpy as f32;
+                                let gpx = global_position.get_x();
+                                let gpy = global_position.get_y();
+                                let size = layer.get_size();
+                                let w = size.get_x();
+                                let h = size.get_y();
+                                let clicked_this = mpx > gpx && mpx < gpx + w && mpy > gpy &&
+                                                   gpy < gpy + h;
                                 if clicked_this {
-                                    println!("clicked on rect: {:?}", layer.get_global_position());
                                     widget.on_button_click(btn_id);
                                     //break for reload widget from new state
                                     should_rebuild = true;
@@ -97,17 +112,15 @@ pub fn initialize(widget: &mut Widget) {
 
                 }
                 Input::Render(_) => {
-                    //todo performance
-
                     //drawing
-                    window.draw_2d(&e, |_c, g| for (i, layer) in unrolled
+                    window.draw_2d(&e, |_c, g| for (i, layer_info) in unrolled
                             .get_layers()
                             .iter()
                             .enumerate() {
                         //todo performance
-
+                        let &(layer, global_position) = layer_info;
                         //parameters
-                        let p = layer.get_global_position();
+                        let p = global_position;
                         let size = layer.get_size();
                         let x = p.get_x() as f64;
                         let y = p.get_y() as f64;
@@ -127,13 +140,15 @@ pub fn initialize(widget: &mut Widget) {
                         //render text
                         match layer.get_text() {
                             &Some(ref txt) => {
-
+                                let layer_key = i as usize;
+                                let mut glyphs_now: &mut Glyphs =
+                                    glyphs_hashmap.get_mut(&layer_key).unwrap();
                                 let txt_content: String = txt.get_content();
                                 //todo text color
                                 let (_r, _g, _b, _a) = txt.get_color().to_tuple();
                                 //println!("{:?}", tr);
                                 text::Text::new_color([_r, _g, _b, _a], txt.get_font_size())
-                                    .draw(&txt_content, &mut glyphs, &_c.draw_state, tr, g);
+                                    .draw(&txt_content, glyphs_now, &_c.draw_state, tr, g);
 
                             }
                             &None => {}
@@ -155,27 +170,49 @@ pub fn initialize(widget: &mut Widget) {
     }
 }
 
+fn load_font(path: &str, window: &PistonWindow) -> Glyphs {
+    let factory = window.factory.clone();
+    let glyphs = Glyphs::new(path, factory).unwrap();
+    glyphs
+}
+
 //flat list of rectangles in app. used for drawing order
+//also info about global position
 struct UnrolledWidget<'a> {
-    content: Vec<&'a Rectangle>,
+    content: Vec<(&'a Rectangle, Vector2)>, //rectangle and its global position
 }
 
 impl<'a> UnrolledWidget<'a> {
     //unroll widget into a list of rectangles
     fn unroll_widget(rt: &Rectangle) -> UnrolledWidget {
         let mut result = UnrolledWidget { content: Vec::new() };
-        let unrolled = result.unroll(rt);
+        let unrolled = result.unroll(rt, Vector2::zero(), rt.get_size());
         result.content = unrolled;
         result
     }
 
     //recursive unrolling
-    fn unroll(&self, rt: &'a Rectangle) -> Vec<&'a Rectangle> {
+    fn unroll(&self,
+              rt: &'a Rectangle,
+              parent_global_position: Vector2,
+              parent_size: Vector2)
+              -> Vec<(&'a Rectangle, Vector2)> {
         let mut v = Vec::new();
-        //println!("found rt!: {:?}", rt);
-        v.push(rt);
+        let pivot = rt.get_pivot();
+        let size = rt.get_size();
+        let local_position = rt.get_local_position();
+        //unity3d-like anchor calculation
+        let mut global_x = parent_global_position.get_x() + local_position.get_x();
+        global_x += pivot.get_x() * (parent_size.get_x() - size.get_x());
+        let reverse_y_pivot = 1. - pivot.get_y();
+        let mut global_y = parent_global_position.get_y() + local_position.get_y();
+        global_y += reverse_y_pivot * (parent_size.get_y() - size.get_y());
+
+        let global_position = Vector2::new(global_x, global_y);
+
+        v.push((rt, global_position));
         for ch in rt.get_children() {
-            let unrolled: Vec<&Rectangle> = self.unroll(ch);
+            let unrolled: Vec<(&Rectangle, Vector2)> = self.unroll(ch, global_position, size);
             for ur in unrolled {
                 v.push(ur);
             }
@@ -184,7 +221,7 @@ impl<'a> UnrolledWidget<'a> {
     }
 
     //get unrolled rectangles
-    fn get_layers(&self) -> &Vec<&'a Rectangle> {
+    fn get_layers(&self) -> &Vec<(&'a Rectangle, Vector2)> {
         &self.content
     }
 }

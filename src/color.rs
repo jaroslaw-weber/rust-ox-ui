@@ -1,5 +1,5 @@
 //color as struct, also contains helper methods
-#[derive(Copy,Clone, Debug)]
+#[derive(Copy,Clone, Debug, Serialize, Deserialize)]
 pub struct Color {
     color: (f32, f32, f32, f32),
 }
@@ -23,5 +23,10 @@ impl Color {
     }
     pub fn white() -> Color {
         Color::new(1., 1., 1., 1.)
+    }
+
+    // :)
+    pub fn rusty() -> Color {
+        Color::new(0.64, 0.32, 0.18, 1.0)
     }
 }
